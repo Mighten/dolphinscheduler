@@ -1,0 +1,7 @@
+# testcase-01-address.yaml
+name: Yaml Parser
+age: 30
+address:
+  city: New York
+  state: NY
+  zipcode: 10001

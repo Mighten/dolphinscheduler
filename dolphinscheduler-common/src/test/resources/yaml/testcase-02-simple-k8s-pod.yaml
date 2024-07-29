@@ -1,0 +1,13 @@
+# testcase-02-simple-k8s-pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: testcase-02-simple-k8s-pod-nginx
+  labels:
+    app: nginx
+spec:
+  containers:
+    - name: nginx-container
+      image: nginx:1.10
+      ports:
+        - containerPort: 80
