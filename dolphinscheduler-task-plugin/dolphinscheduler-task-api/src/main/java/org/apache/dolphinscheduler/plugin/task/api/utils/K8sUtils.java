@@ -17,14 +17,27 @@
 
 package org.apache.dolphinscheduler.plugin.task.api.utils;
 
-import static org.apache.dolphinscheduler.plugin.task.api.TaskConstants.LOG_LINES;
-
+import org.apache.dolphinscheduler.common.utils.YamlUtils;
+import org.apache.dolphinscheduler.plugin.task.api.TaskConstants;
 import org.apache.dolphinscheduler.plugin.task.api.TaskException;
 
-import java.util.List;
+import org.apache.commons.lang3.StringUtils;
 
+import java.io.File;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+
+import io.fabric8.kubernetes.api.model.ConfigMap;
+import io.fabric8.kubernetes.api.model.ObjectMeta;
 import io.fabric8.kubernetes.api.model.Pod;
+import io.fabric8.kubernetes.api.model.StatusDetails;
 import io.fabric8.kubernetes.api.model.batch.v1.Job;
 import io.fabric8.kubernetes.client.Config;
 import io.fabric8.kubernetes.client.KubernetesClient;
@@ -33,17 +46,107 @@ import io.fabric8.kubernetes.client.Watch;
 import io.fabric8.kubernetes.client.Watcher;
 
 @Slf4j
+@Data
 public class K8sUtils {
 
     private KubernetesClient client;
 
+    /**
+     * create a Config Map from YAML file
+     *
+     * @param configMapFile the YAML file to load
+     * @return the Config Map created
+     */
+    public ConfigMap createConfigMap(File configMapFile) {
+        try {
+            ConfigMap configMap = YamlUtils.load(configMapFile, new TypeReference<ConfigMap>() {
+            });
+            ObjectMeta metadata = Objects.requireNonNull(configMap).getMetadata();
+            String namespace = metadata.getNamespace();
+
+            if (StringUtils.isBlank(namespace)) {
+                namespace = "default";
+                metadata.setNamespace(namespace);
+                configMap.setMetadata(metadata);
+            }
+            return client.configMaps().resource(configMap).create();
+        } catch (Exception e) {
+            throw new TaskException("fail to create ConfigMap", e);
+        }
+    }
+
+    /**
+     * create pod from YAML file
+     *
+     * @param podFile the YAML file to load
+     * @return the pod created
+     */
+    public Pod createPod(File podFile) {
+        try {
+            Pod pod = YamlUtils.load(podFile, new TypeReference<Pod>() {
+            });
+            ObjectMeta metadata = Objects.requireNonNull(pod).getMetadata();
+            String namespace = metadata.getNamespace();
+
+            if (StringUtils.isBlank(namespace)) {
+                namespace = "default";
+                metadata.setNamespace(namespace);
+                pod.setMetadata(metadata);
+            }
+            return client.pods().resource(pod).create();
+        } catch (Exception e) {
+            throw new TaskException("fail to create pod", e);
+        }
+    }
+
+    /**
+     * delete pod in the namespace
+     *
+     * @param namespace the namespace of the Pod
+     * @param podName the pod name
+     * @return a list of StatusDetails
+     */
+    public List<StatusDetails> deletePod(String namespace, String podName) {
+        try {
+            return client.pods()
+                    .inNamespace(namespace)
+                    .withName(podName)
+                    .delete();
+        } catch (Exception e) {
+            String errorMessage = String.format("fail to delete pod '%s' in Namespace '%s'", podName, namespace);
+            throw new TaskException(errorMessage, e);
+        }
+    }
+
+    /**
+     * delete Config Map in the namespace
+     *
+     * @param namespace the namespace of the Config Map
+     * @param configMapName the name of the Config Map
+     * @return a list of StatusDetails
+     */
+    public List<StatusDetails> deleteConfigMap(String namespace, String configMapName) {
+        try {
+            return client.configMaps()
+                    .inNamespace(namespace)
+                    .withName(configMapName)
+                    .delete();
+        } catch (Exception e) {
+            String errorMessage =
+                    String.format("fail to delete ConfigMap '%s' in Namespace '%s'", configMapName, namespace);
+            throw new TaskException(errorMessage, e);
+        }
+    }
+
     public void createJob(String namespace, Job job) {
         try {
+            ObjectMeta jobMetadata = job.getMetadata();
+            jobMetadata.setNamespace(namespace);
             client.batch()
                     .v1()
                     .jobs()
-                    .inNamespace(namespace)
-                    .create(job);
+                    .resource(job)
+                    .create();
         } catch (Exception e) {
             throw new TaskException("fail to create job", e);
         }
@@ -83,6 +186,31 @@ public class K8sUtils {
         }
     }
 
+    /**
+     * Print Log from a namespaced pod
+     *
+     * @param namespace the name of Namespace
+     * @return Pod logs of Pretty output
+     */
+    public List<String> getLogsOfNamespacedPods(String namespace) {
+        try {
+            List<Pod> podList = client.pods().inNamespace(namespace).list().getItems();
+            return podList.stream()
+                    .map((Pod pod) -> {
+                        String podName = pod.getMetadata().getName();
+                        return client.pods().inNamespace(namespace)
+                                .withName(podName)
+                                .tailingLines(TaskConstants.LOG_LINES)
+                                .getLog(Boolean.TRUE);
+                    })
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            log.error("fail to getPodLog", e);
+            log.error("response bodies : {}", e.getMessage());
+            return null;
+        }
+    }
+
     public String getPodLog(String jobName, String namespace) {
         try {
             List<Pod> podList = client.pods().inNamespace(namespace).list().getItems();
@@ -95,7 +223,7 @@ public class K8sUtils {
             }
             return client.pods().inNamespace(namespace)
                     .withName(podName)
-                    .tailingLines(LOG_LINES)
+                    .tailingLines(TaskConstants.LOG_LINES)
                     .getLog(Boolean.TRUE);
         } catch (Exception e) {
             log.error("fail to getPodLog", e);
@@ -104,13 +232,23 @@ public class K8sUtils {
         return null;
     }
 
-    public void buildClient(String configYaml) {
+    /**
+     * Builds a Kubernetes API client using a kubeConfig YAML string.
+     *
+     * @param configYaml a YAML string containing the Kubernetes configuration
+     * @throws TaskException if there is an error building the Kubernetes client
+     */
+    public void buildClient(String configYaml) throws TaskException {
         try {
             Config config = Config.fromKubeconfig(configYaml);
             client = new KubernetesClientBuilder().withConfig(config).build();
         } catch (Exception e) {
             throw new TaskException("fail to build k8s ApiClient", e);
         }
+    }
+
+    public KubernetesClient getClient() {
+        return client;
     }
 
 }
