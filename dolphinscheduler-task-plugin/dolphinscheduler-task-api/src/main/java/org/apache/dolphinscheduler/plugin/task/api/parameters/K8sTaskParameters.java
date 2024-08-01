@@ -51,6 +51,11 @@ public class K8sTaskParameters extends AbstractParameters {
     private String kubeConfig;
     private int datasource;
     private String type;
+    // whether the YAML task is custom-configured(1) for Kubernetes or not(0)
+    private int customConfig;
+    // the YAML file content string, if `customConfig` == 1
+    private String yamlContent;
+
     @Override
     public boolean checkParameters() {
         return StringUtils.isNotEmpty(image);
