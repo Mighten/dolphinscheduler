@@ -25,7 +25,6 @@ import org.apache.commons.lang3.StringUtils;
 
 import java.io.File;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -35,6 +34,7 @@ import lombok.extern.slf4j.Slf4j;
 import com.fasterxml.jackson.core.type.TypeReference;
 
 import io.fabric8.kubernetes.api.model.ConfigMap;
+import io.fabric8.kubernetes.api.model.HasMetadata;
 import io.fabric8.kubernetes.api.model.ObjectMeta;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.StatusDetails;
@@ -54,6 +54,32 @@ public class K8sUtils {
     private static final String K8S_NAMESPACE_DEFAULT = "default";
 
     /**
+     * get the original namespace, or default namespace defined in `K8sUtils.K8S_NAMESPACE_DEFAULT`
+     * @param namespace the namespace to be inspected
+     * @return the original namespace if it is valid; otherwise, return default namespace
+     */
+    public static String getOrDefaultNamespace(String namespace) {
+        return StringUtils.isBlank(namespace) ? K8S_NAMESPACE_DEFAULT : namespace;
+    }
+
+    /**
+     * get the original resource, or the one with default namespace
+     * @param resource the resource to be inspected
+     * @return the original resource, or the default namespaced one
+     * @throws TaskException if resource is null
+     */
+    public static HasMetadata getOrDefaultNamespacedResource(HasMetadata resource) throws TaskException {
+        if (resource == null)
+            throw new TaskException("failed to create k8s resource with null parameter");
+        ObjectMeta metadata = resource.getMetadata();
+        if (StringUtils.isBlank(metadata.getNamespace())) {
+            metadata.setNamespace(K8S_NAMESPACE_DEFAULT);
+            resource.setMetadata(metadata);
+        }
+        return resource;
+    }
+
+    /**
      * create a Config Map from YAML file
      *
      * @param configMapFile the YAML file to load
@@ -61,16 +87,9 @@ public class K8sUtils {
      */
     public ConfigMap createConfigMap(File configMapFile) {
         try {
-            ConfigMap configMap = YamlUtils.load(configMapFile, new TypeReference<ConfigMap>() {
-            });
-            ObjectMeta metadata = Objects.requireNonNull(configMap).getMetadata();
-            String namespace = metadata.getNamespace();
-
-            if (StringUtils.isBlank(namespace)) {
-                namespace = K8S_NAMESPACE_DEFAULT;
-                metadata.setNamespace(namespace);
-                configMap.setMetadata(metadata);
-            }
+            ConfigMap configMap = (ConfigMap) getOrDefaultNamespacedResource(
+                    YamlUtils.load(configMapFile, new TypeReference<ConfigMap>() {
+                    }));
             return client.configMaps().resource(configMap).create();
         } catch (Exception e) {
             throw new TaskException("fail to create ConfigMap", e);
@@ -85,16 +104,9 @@ public class K8sUtils {
      */
     public Pod createPod(File podFile) {
         try {
-            Pod pod = YamlUtils.load(podFile, new TypeReference<Pod>() {
-            });
-            ObjectMeta metadata = Objects.requireNonNull(pod).getMetadata();
-            String namespace = metadata.getNamespace();
-
-            if (StringUtils.isBlank(namespace)) {
-                namespace = K8S_NAMESPACE_DEFAULT;
-                metadata.setNamespace(namespace);
-                pod.setMetadata(metadata);
-            }
+            Pod pod = (Pod) getOrDefaultNamespacedResource(
+                    YamlUtils.load(podFile, new TypeReference<Pod>() {
+                    }));
             return client.pods().resource(pod).create();
         } catch (Exception e) {
             throw new TaskException("fail to create pod", e);
@@ -110,9 +122,7 @@ public class K8sUtils {
      */
     public List<StatusDetails> deletePod(String namespace, String podName) {
         try {
-            if (StringUtils.isBlank(namespace)) {
-                namespace = K8S_NAMESPACE_DEFAULT;
-            }
+            namespace = getOrDefaultNamespace(namespace);
             return client.pods()
                     .inNamespace(namespace)
                     .withName(podName)
@@ -132,6 +142,7 @@ public class K8sUtils {
      */
     public List<StatusDetails> deleteConfigMap(String namespace, String configMapName) {
         try {
+            namespace = getOrDefaultNamespace(namespace);
             return client.configMaps()
                     .inNamespace(namespace)
                     .withName(configMapName)
@@ -145,17 +156,7 @@ public class K8sUtils {
 
     public void createJob(String namespace, Job job) {
         try {
-            ObjectMeta jobMetadata = job.getMetadata();
-            if (StringUtils.isNotBlank(namespace)) {
-                // valid namespace for overriding the existing one defined in `job`
-                jobMetadata.setNamespace(namespace);
-                job.setMetadata(jobMetadata);
-            } else if (StringUtils.isBlank(job.getMetadata().getNamespace())) {
-                // use `K8S_NAMESPACE_DEFAULT` (a.k.a., "default") namespace
-                // if no valid namespace specified in either `namespace` param or job::getMetadata::getNamespace
-                jobMetadata.setNamespace(K8S_NAMESPACE_DEFAULT);
-                job.setMetadata(jobMetadata);
-            }
+            job = (Job) getOrDefaultNamespacedResource(job);
             client.batch()
                     .v1()
                     .jobs()
@@ -168,13 +169,10 @@ public class K8sUtils {
 
     public void deleteJob(String jobName, String namespace) {
         try {
-            if (StringUtils.isBlank(namespace)) {
-                namespace = K8S_NAMESPACE_DEFAULT;
-            }
             client.batch()
                     .v1()
                     .jobs()
-                    .inNamespace(namespace)
+                    .inNamespace(getOrDefaultNamespace(namespace))
                     .withName(jobName)
                     .delete();
         } catch (Exception e) {
@@ -210,9 +208,7 @@ public class K8sUtils {
      * @return Pod logs of Pretty output
      */
     public List<String> getLogsOfNamespacedPods(String namespace) {
-        if (StringUtils.isBlank(namespace)) {
-            namespace = K8S_NAMESPACE_DEFAULT;
-        }
+        namespace = getOrDefaultNamespace(namespace);
         final String namespaceFinalInStreamOperation = namespace;
         try {
             List<Pod> podList = client.pods().inNamespace(namespace).list().getItems();
@@ -235,9 +231,7 @@ public class K8sUtils {
 
     public String getPodLog(String jobName, String namespace) {
         try {
-            if (StringUtils.isBlank(namespace)) {
-                namespace = K8S_NAMESPACE_DEFAULT;
-            }
+            namespace = getOrDefaultNamespace(namespace);
             List<Pod> podList = client.pods().inNamespace(namespace).list().getItems();
             String podName = null;
             for (Pod pod : podList) {

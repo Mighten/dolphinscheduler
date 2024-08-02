@@ -25,10 +25,10 @@ import org.apache.dolphinscheduler.plugin.task.api.enums.K8sPodPhaseConstants;
 import org.apache.dolphinscheduler.plugin.task.api.k8s.AbstractK8sOperation;
 import org.apache.dolphinscheduler.plugin.task.api.model.TaskResponse;
 import org.apache.dolphinscheduler.plugin.task.api.parameters.K8sYamlContentDto;
+import org.apache.dolphinscheduler.plugin.task.api.utils.K8sUtils;
 import org.apache.dolphinscheduler.plugin.task.api.utils.LogUtils;
 
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang3.StringUtils;
 
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -38,7 +38,6 @@ import lombok.extern.slf4j.Slf4j;
 import com.fasterxml.jackson.core.type.TypeReference;
 
 import io.fabric8.kubernetes.api.model.HasMetadata;
-import io.fabric8.kubernetes.api.model.ObjectMeta;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodList;
 import io.fabric8.kubernetes.api.model.StatusDetails;
@@ -62,31 +61,26 @@ public class K8sPodOperation implements AbstractK8sOperation {
     @Override
     public HasMetadata buildMetadata(K8sYamlContentDto yamlContentDto) {
         String yamlK8sResourceStr = yamlContentDto.getYaml();
-        Pod metadata = YamlUtils.load(yamlK8sResourceStr, new TypeReference<Pod>() {
-        });
-        return client.pods().resource(metadata).get();
+        Pod pod = (Pod) K8sUtils.getOrDefaultNamespacedResource(
+                YamlUtils.load(yamlK8sResourceStr, new TypeReference<Pod>() {
+                }));
+        return client.pods().resource(pod).get();
     }
 
     /**
      * create or replace a pod in the kubernetes cluster
      * @param metadata Pod metadata (io.fabric8.kubernetes.api.model.Pod)
-     * @throws Exception if error occurred in stop a resource
+     * @throws Exception if error occurred in creating or replacing a resource
      */
     @Override
     public void createOrReplaceMetadata(HasMetadata metadata) throws Exception {
-        Pod pod = (Pod) metadata;
-        ObjectMeta podMetadataMap = pod.getMetadata();
-        // set namespace to "default" if no namespace assigned to Pod
-        if (StringUtils.isBlank(podMetadataMap.getNamespace())) {
-            podMetadataMap.setNamespace("default");
-            pod.setMetadata(podMetadataMap);
-        }
+        Pod pod = (Pod) K8sUtils.getOrDefaultNamespacedResource(metadata);
         client.pods().resource(pod).createOrReplace();
     }
 
     @Override
     public int getState(HasMetadata hasMetadata) {
-        Pod pod = (Pod) hasMetadata;
+        Pod pod = (Pod) K8sUtils.getOrDefaultNamespacedResource(hasMetadata);
         String currentPodPhase = pod.getStatus().getPhase();
 
         if (K8sPodPhaseConstants.SUCCEEDED.equals(currentPodPhase)) {
@@ -148,6 +142,7 @@ public class K8sPodOperation implements AbstractK8sOperation {
 
     @Override
     public LogWatch getLogWatcher(String labelValue, String namespace) {
+        namespace = K8sUtils.getOrDefaultNamespace(namespace);
         boolean metadataIsReady = false;
         Pod pod = null;
         while (!metadataIsReady) {
@@ -175,11 +170,11 @@ public class K8sPodOperation implements AbstractK8sOperation {
      * stop a pod in the kubernetes cluster
      * @param metadata Pod metadata (io.fabric8.kubernetes.api.model.Pod)
      * @return a list of StatusDetails
-     * @throws Exception if error occurred in stop a resource
+     * @throws Exception if error occurred in stopping a resource
      */
     @Override
     public List<StatusDetails> stopMetadata(HasMetadata metadata) throws Exception {
-        Pod pod = (Pod) metadata;
+        Pod pod = (Pod) K8sUtils.getOrDefaultNamespacedResource(metadata);
         return client.pods().resource(pod).delete();
     }
 
@@ -187,6 +182,7 @@ public class K8sPodOperation implements AbstractK8sOperation {
      * get driver pod
      */
     private FilterWatchListDeletable<Pod, PodList, PodResource> getListenPod(String labelValue, String namespace) {
+        namespace = K8sUtils.getOrDefaultNamespace(namespace);
         List<Pod> podList = null;
         FilterWatchListDeletable<Pod, PodList, PodResource> watchList = null;
         int retryTimes = 0;

@@ -39,7 +39,7 @@ public interface AbstractK8sOperation {
     /**
      * create or replace a resource in the kubernetes cluster
      * @param metadata resource metadata, e.g., io.fabric8.kubernetes.api.model.Pod
-     * @throws Exception if error occurred in stop a resource
+     * @throws Exception if error occurred in creating or replacing a resource
      */
     void createOrReplaceMetadata(HasMetadata metadata) throws Exception;
 
@@ -47,7 +47,7 @@ public interface AbstractK8sOperation {
      * stop a resource in the kubernetes cluster
      * @param metadata resource metadata, e.g., io.fabric8.kubernetes.api.model.Pod
      * @return a list of StatusDetails
-     * @throws Exception if error occurred in stop a resource
+     * @throws Exception if error occurred in stopping a resource
      */
     List<StatusDetails> stopMetadata(HasMetadata metadata) throws Exception;
 
