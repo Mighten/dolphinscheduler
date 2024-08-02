@@ -153,16 +153,14 @@ public class K8sYamlTaskExecutor extends AbstractK8sTaskExecutor {
 
     @Override
     public void stopJobOnK8s(String k8sParameterStr) {
-        K8sTaskMainParameters k8STaskMainParameters =
-                JSONUtils.parseObject(k8sParameterStr, K8sTaskMainParameters.class);
-        String namespaceName = Objects.requireNonNull(k8STaskMainParameters).getNamespaceName();
+        String namespaceName = metadata.getMetadata().getNamespace();
         String jobName = metadata.getMetadata().getName();
         try {
-            if (Boolean.TRUE.equals(k8sUtils.jobExist(jobName, namespaceName))) {
-                k8sUtils.deleteJob(jobName, namespaceName);
+            if (TaskConstants.RUNNING_CODE == abstractK8sOperation.getState(metadata)) {
+                abstractK8sOperation.stopMetadata(metadata);
             }
         } catch (Exception e) {
-            log.error("[K8sYamlJobExecutor-{}] fail to stop job", jobName);
+            log.error("[K8sYamlJobExecutor-{}] fail to stop job in namespace {}", jobName, namespaceName);
             throw new TaskException("K8sYamlJobExecutor fail to stop job", e);
         }
     }
@@ -205,8 +203,6 @@ public class K8sYamlTaskExecutor extends AbstractK8sTaskExecutor {
                 .newSingleDaemonScheduledExecutorService("CollectPodLogOutput-thread-" + taskRequest.getTaskName());
 
         String taskInstanceId = String.valueOf(taskRequest.getTaskInstanceId());
-        K8sTaskExecutionContext k8sTaskExecutionContext = taskRequest.getK8sTaskExecutionContext();
-
         String taskName = taskRequest.getTaskName().toLowerCase(Locale.ROOT);
         String containerName = String.format("%s-%s", taskName, taskInstanceId);
         podLogOutputFuture = collectPodLogExecutorService.submit(() -> {
@@ -217,9 +213,7 @@ public class K8sYamlTaskExecutor extends AbstractK8sTaskExecutor {
             try (
                     LogWatch watcher =
                             abstractK8sOperation.getLogWatcher(containerName, metadata.getMetadata().getNamespace())) {
-                LogUtils.setTaskInstanceLogFullPathMDC(taskRequest.getLogPath());
                 String line;
-
                 try (BufferedReader reader = new BufferedReader(new InputStreamReader(watcher.getOutput()))) {
                     while ((line = reader.readLine()) != null) {
                         log.info("[K8S-pod-log] {}", line);

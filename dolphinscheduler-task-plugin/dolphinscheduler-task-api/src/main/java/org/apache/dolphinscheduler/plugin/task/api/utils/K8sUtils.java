@@ -51,6 +51,8 @@ public class K8sUtils {
 
     private KubernetesClient client;
 
+    private static final String K8S_NAMESPACE_DEFAULT = "default";
+
     /**
      * create a Config Map from YAML file
      *
@@ -65,7 +67,7 @@ public class K8sUtils {
             String namespace = metadata.getNamespace();
 
             if (StringUtils.isBlank(namespace)) {
-                namespace = "default";
+                namespace = K8S_NAMESPACE_DEFAULT;
                 metadata.setNamespace(namespace);
                 configMap.setMetadata(metadata);
             }
@@ -89,7 +91,7 @@ public class K8sUtils {
             String namespace = metadata.getNamespace();
 
             if (StringUtils.isBlank(namespace)) {
-                namespace = "default";
+                namespace = K8S_NAMESPACE_DEFAULT;
                 metadata.setNamespace(namespace);
                 pod.setMetadata(metadata);
             }
@@ -108,6 +110,9 @@ public class K8sUtils {
      */
     public List<StatusDetails> deletePod(String namespace, String podName) {
         try {
+            if (StringUtils.isBlank(namespace)) {
+                namespace = K8S_NAMESPACE_DEFAULT;
+            }
             return client.pods()
                     .inNamespace(namespace)
                     .withName(podName)
@@ -141,7 +146,16 @@ public class K8sUtils {
     public void createJob(String namespace, Job job) {
         try {
             ObjectMeta jobMetadata = job.getMetadata();
-            jobMetadata.setNamespace(namespace);
+            if (StringUtils.isNotBlank(namespace)) {
+                // valid namespace for overriding the existing one defined in `job`
+                jobMetadata.setNamespace(namespace);
+                job.setMetadata(jobMetadata);
+            } else if (StringUtils.isBlank(job.getMetadata().getNamespace())) {
+                // use `K8S_NAMESPACE_DEFAULT` (a.k.a., "default") namespace
+                // if no valid namespace specified in either `namespace` param or job::getMetadata::getNamespace
+                jobMetadata.setNamespace(K8S_NAMESPACE_DEFAULT);
+                job.setMetadata(jobMetadata);
+            }
             client.batch()
                     .v1()
                     .jobs()
@@ -154,6 +168,9 @@ public class K8sUtils {
 
     public void deleteJob(String jobName, String namespace) {
         try {
+            if (StringUtils.isBlank(namespace)) {
+                namespace = K8S_NAMESPACE_DEFAULT;
+            }
             client.batch()
                     .v1()
                     .jobs()
@@ -193,12 +210,17 @@ public class K8sUtils {
      * @return Pod logs of Pretty output
      */
     public List<String> getLogsOfNamespacedPods(String namespace) {
+        if (StringUtils.isBlank(namespace)) {
+            namespace = K8S_NAMESPACE_DEFAULT;
+        }
+        final String namespaceFinalInStreamOperation = namespace;
         try {
             List<Pod> podList = client.pods().inNamespace(namespace).list().getItems();
             return podList.stream()
                     .map((Pod pod) -> {
                         String podName = pod.getMetadata().getName();
-                        return client.pods().inNamespace(namespace)
+                        return client.pods()
+                                .inNamespace(namespaceFinalInStreamOperation)
                                 .withName(podName)
                                 .tailingLines(TaskConstants.LOG_LINES)
                                 .getLog(Boolean.TRUE);
@@ -213,6 +235,9 @@ public class K8sUtils {
 
     public String getPodLog(String jobName, String namespace) {
         try {
+            if (StringUtils.isBlank(namespace)) {
+                namespace = K8S_NAMESPACE_DEFAULT;
+            }
             List<Pod> podList = client.pods().inNamespace(namespace).list().getItems();
             String podName = null;
             for (Pod pod : podList) {

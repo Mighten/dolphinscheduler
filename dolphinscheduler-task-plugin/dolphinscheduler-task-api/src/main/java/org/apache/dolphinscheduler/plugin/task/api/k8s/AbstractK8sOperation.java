@@ -22,9 +22,11 @@ import org.apache.dolphinscheduler.plugin.task.api.TaskExecutionContext;
 import org.apache.dolphinscheduler.plugin.task.api.model.TaskResponse;
 import org.apache.dolphinscheduler.plugin.task.api.parameters.K8sYamlContentDto;
 
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
 import io.fabric8.kubernetes.api.model.HasMetadata;
+import io.fabric8.kubernetes.api.model.StatusDetails;
 import io.fabric8.kubernetes.client.Watch;
 import io.fabric8.kubernetes.client.dsl.LogWatch;
 
@@ -34,7 +36,20 @@ public interface AbstractK8sOperation {
 
     HasMetadata buildMetadata(K8sYamlContentDto yamlContentDto);
 
-    void createOrReplaceMetadata(HasMetadata metadata);
+    /**
+     * create or replace a resource in the kubernetes cluster
+     * @param metadata resource metadata, e.g., io.fabric8.kubernetes.api.model.Pod
+     * @throws Exception if error occurred in stop a resource
+     */
+    void createOrReplaceMetadata(HasMetadata metadata) throws Exception;
+
+    /**
+     * stop a resource in the kubernetes cluster
+     * @param metadata resource metadata, e.g., io.fabric8.kubernetes.api.model.Pod
+     * @return a list of StatusDetails
+     * @throws Exception if error occurred in stop a resource
+     */
+    List<StatusDetails> stopMetadata(HasMetadata metadata) throws Exception;
 
     int getState(HasMetadata hasMetadata);
 

@@ -41,7 +41,7 @@ import io.fabric8.kubernetes.api.model.HasMetadata;
 import io.fabric8.kubernetes.api.model.ObjectMeta;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodList;
-import io.fabric8.kubernetes.api.model.apps.Deployment;
+import io.fabric8.kubernetes.api.model.StatusDetails;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.Watch;
 import io.fabric8.kubernetes.client.Watcher;
@@ -62,13 +62,18 @@ public class K8sPodOperation implements AbstractK8sOperation {
     @Override
     public HasMetadata buildMetadata(K8sYamlContentDto yamlContentDto) {
         String yamlK8sResourceStr = yamlContentDto.getYaml();
-        Deployment metadata = YamlUtils.load(yamlK8sResourceStr, new TypeReference<Deployment>() {
+        Pod metadata = YamlUtils.load(yamlK8sResourceStr, new TypeReference<Pod>() {
         });
-        return client.apps().deployments().resource(metadata).get();
+        return client.pods().resource(metadata).get();
     }
 
+    /**
+     * create or replace a pod in the kubernetes cluster
+     * @param metadata Pod metadata (io.fabric8.kubernetes.api.model.Pod)
+     * @throws Exception if error occurred in stop a resource
+     */
     @Override
-    public void createOrReplaceMetadata(HasMetadata metadata) {
+    public void createOrReplaceMetadata(HasMetadata metadata) throws Exception {
         Pod pod = (Pod) metadata;
         ObjectMeta podMetadataMap = pod.getMetadata();
         // set namespace to "default" if no namespace assigned to Pod
@@ -102,6 +107,8 @@ public class K8sPodOperation implements AbstractK8sOperation {
             @Override
             public void eventReceived(Action action, Pod pod) {
                 try {
+                    LogUtils.setWorkflowAndTaskInstanceIDMDC(taskRequest.getProcessInstanceId(),
+                            taskRequest.getTaskInstanceId());
                     LogUtils.setTaskInstanceLogFullPathMDC(taskRequest.getLogPath());
                     log.info("event received : job:{} action:{}", pod.getMetadata().getName(), action);
                     if (action == Action.DELETED) {
@@ -120,14 +127,18 @@ public class K8sPodOperation implements AbstractK8sOperation {
                     }
                 } finally {
                     LogUtils.removeTaskInstanceLogFullPathMDC();
+                    LogUtils.removeWorkflowAndTaskInstanceIdMDC();
                 }
             }
 
             @Override
             public void onClose(WatcherException e) {
+                LogUtils.setWorkflowAndTaskInstanceIDMDC(taskRequest.getProcessInstanceId(),
+                        taskRequest.getTaskInstanceId());
                 log.error("[K8sJobExecutor-{}] fail in k8s: {}", hasMetadata.getMetadata().getName(), e.getMessage());
                 taskResponse.setExitStatusCode(TaskConstants.EXIT_CODE_FAILURE);
                 countDownLatch.countDown();
+                LogUtils.removeWorkflowAndTaskInstanceIdMDC();
             }
         };
         return client.pods().inNamespace(hasMetadata.getMetadata().getNamespace())
@@ -158,6 +169,18 @@ public class K8sPodOperation implements AbstractK8sOperation {
                 .withName(pod.getMetadata().getName())
                 .inContainer(pod.getMetadata().getName())
                 .watchLog();
+    }
+
+    /**
+     * stop a pod in the kubernetes cluster
+     * @param metadata Pod metadata (io.fabric8.kubernetes.api.model.Pod)
+     * @return a list of StatusDetails
+     * @throws Exception if error occurred in stop a resource
+     */
+    @Override
+    public List<StatusDetails> stopMetadata(HasMetadata metadata) throws Exception {
+        Pod pod = (Pod) metadata;
+        return client.pods().resource(pod).delete();
     }
 
     /*
