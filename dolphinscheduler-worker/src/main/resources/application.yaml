@@ -29,7 +29,7 @@ registry:
   type: zookeeper
   zookeeper:
     namespace: dolphinscheduler
-    connect-string: localhost:2181
+    connect-string: 192.168.56.10:2181
     retry-policy:
       base-sleep-time: 1s
       max-sleep: 3s

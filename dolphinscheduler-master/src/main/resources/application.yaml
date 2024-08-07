@@ -72,7 +72,7 @@ registry:
   type: zookeeper
   zookeeper:
     namespace: dolphinscheduler
-    connect-string: localhost:2181
+    connect-string: 192.168.56.10:2181
     retry-policy:
       base-sleep-time: 1s
       max-sleep: 3s
@@ -162,8 +162,8 @@ spring:
     activate:
       on-profile: mysql
   datasource:
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://127.0.0.1:3306/dolphinscheduler
+    driver-class-name: com.mysql.jdbc.Driver
+    url: jdbc:mysql://192.168.56.10:3306/dolphinscheduler
     username: root
     password: root
   quartz:
