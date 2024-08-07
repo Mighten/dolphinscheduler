@@ -24,7 +24,7 @@ import org.apache.dolphinscheduler.plugin.task.api.TaskExecutionContext;
 import org.apache.dolphinscheduler.plugin.task.api.enums.K8sPodPhaseConstants;
 import org.apache.dolphinscheduler.plugin.task.api.k8s.AbstractK8sOperation;
 import org.apache.dolphinscheduler.plugin.task.api.model.TaskResponse;
-import org.apache.dolphinscheduler.plugin.task.api.parameters.K8sYamlContentDto;
+import org.apache.dolphinscheduler.plugin.task.api.parameters.K8sYamlContentDTO;
 import org.apache.dolphinscheduler.plugin.task.api.utils.K8sUtils;
 import org.apache.dolphinscheduler.plugin.task.api.utils.LogUtils;
 
@@ -59,7 +59,7 @@ public class K8sPodOperation implements AbstractK8sOperation {
     }
 
     @Override
-    public HasMetadata buildMetadata(K8sYamlContentDto yamlContentDto) {
+    public HasMetadata buildMetadata(K8sYamlContentDTO yamlContentDto) {
         String yamlK8sResourceStr = yamlContentDto.getYaml();
         Pod pod = (Pod) K8sUtils.getOrDefaultNamespacedResource(
                 YamlUtils.load(yamlK8sResourceStr, new TypeReference<Pod>() {

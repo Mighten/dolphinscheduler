@@ -25,7 +25,7 @@ import lombok.Data;
  * the Data Transfer Object (DTO) for YAML file content
  */
 @Data
-public class K8sYamlContentDto {
+public class K8sYamlContentDTO {
 
     /**
      * The type of YAML resource.

@@ -27,7 +27,7 @@ import org.apache.dolphinscheduler.plugin.task.api.enums.K8sYamlType;
 import org.apache.dolphinscheduler.plugin.task.api.enums.TaskTimeoutStrategy;
 import org.apache.dolphinscheduler.plugin.task.api.k8s.impl.K8sPodOperation;
 import org.apache.dolphinscheduler.plugin.task.api.model.TaskResponse;
-import org.apache.dolphinscheduler.plugin.task.api.parameters.K8sYamlContentDto;
+import org.apache.dolphinscheduler.plugin.task.api.parameters.K8sYamlContentDTO;
 import org.apache.dolphinscheduler.plugin.task.api.parser.TaskOutputParameterParser;
 import org.apache.dolphinscheduler.plugin.task.api.utils.LogUtils;
 import org.apache.dolphinscheduler.plugin.task.api.utils.MapUtils;
@@ -89,9 +89,9 @@ public class K8sYamlTaskExecutor extends AbstractK8sTaskExecutor {
             k8sUtils.buildClient(k8sTaskExecutionContext.getConfigYaml());
 
             // parse user-customized YAML string wrapped up in JSON
-            // e.g.: `K8sYamlContentDto` looks like: `{"type": ${K8sYamlType.POD}, "yaml": ${yaml} }`
-            K8sYamlContentDto k8sYamlContentDto = JSONUtils.parseObject(yamlContentString, K8sYamlContentDto.class);
-            k8sYamlType = Objects.requireNonNull(k8sYamlContentDto).getType();
+            // i.e., `K8sYamlContentDto` looks like: `{"type": ${K8sYamlType.POD}, "yaml": ${yaml} }`
+            K8sYamlContentDTO k8sYamlContentDTO = JSONUtils.parseObject(yamlContentString, K8sYamlContentDTO.class);
+            k8sYamlType = Objects.requireNonNull(k8sYamlContentDTO).getType();
             generateOperation();
 
             submitJob2k8s(yamlContentString);
@@ -128,8 +128,8 @@ public class K8sYamlTaskExecutor extends AbstractK8sTaskExecutor {
         int taskInstanceId = taskRequest.getTaskInstanceId();
         String k8sJobName = String.format("%s-%s", taskName, taskInstanceId);
 
-        K8sYamlContentDto yamlContentDto =
-                JSONUtils.parseObject(yamlContentString, K8sYamlContentDto.class);
+        K8sYamlContentDTO yamlContentDto =
+                JSONUtils.parseObject(yamlContentString, K8sYamlContentDTO.class);
 
         metadata = abstractK8sOperation.buildMetadata(yamlContentDto);
 
@@ -137,9 +137,6 @@ public class K8sYamlTaskExecutor extends AbstractK8sTaskExecutor {
         if (MapUtils.isEmpty(labelMap)) {
             labelMap = new HashMap<String, String>(1);
         }
-        // add special label which make people to get it simple
-        labelMap.put(TaskConstants.LAYER_LABEL, TaskConstants.LAYER_LABEL_VALUE);
-        labelMap.put(TaskConstants.NAME_LABEL, k8sJobName);
 
         try {
             log.info("[K8sYamlJobExecutor-{}-{}] start to submit job", taskName, taskInstanceId);
@@ -156,9 +153,7 @@ public class K8sYamlTaskExecutor extends AbstractK8sTaskExecutor {
         String namespaceName = metadata.getMetadata().getNamespace();
         String jobName = metadata.getMetadata().getName();
         try {
-            if (TaskConstants.RUNNING_CODE == abstractK8sOperation.getState(metadata)) {
-                abstractK8sOperation.stopMetadata(metadata);
-            }
+            abstractK8sOperation.stopMetadata(metadata);
         } catch (Exception e) {
             log.error("[K8sYamlJobExecutor-{}] fail to stop job in namespace {}", jobName, namespaceName);
             throw new TaskException("K8sYamlJobExecutor fail to stop job", e);
