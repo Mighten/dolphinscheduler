@@ -58,7 +58,15 @@ public class K8sTaskParameters extends AbstractParameters {
 
     @Override
     public boolean checkParameters() {
-        return StringUtils.isNotEmpty(image);
+        if (customConfig == 0) {
+            // for low-code k8s Job
+            return StringUtils.isNotEmpty(image);
+        } else if (customConfig == 1) {
+            // for user-customized k8s YAML task
+            return StringUtils.isNotBlank(yamlContent);
+        }
+        // for `customConfig` invalid or unsupported
+        return false;
     }
 
     @Override
