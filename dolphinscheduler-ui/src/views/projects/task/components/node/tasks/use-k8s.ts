@@ -52,7 +52,7 @@ export function useK8s({
     kubeConfig: '',
     namespace: '',
     customConfig: false,
-    yamlContent: '',
+    yamlContent: ''
   } as INodeData)
 
   return {

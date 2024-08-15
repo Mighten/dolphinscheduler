@@ -17,50 +17,50 @@
 import { useCustomParams, useCustomLabels, useNodeSelectors } from '.'
 import type { IJsonItem } from '../types'
 import { useI18n } from 'vue-i18n'
-import {onMounted, ref, watch} from "vue";
+import { onMounted, ref, watch } from 'vue'
 
 export function useK8s(model: { [field: string]: any }): IJsonItem[] {
   const { t } = useI18n()
 
   // default width for
-  const yamlEditorSpan = ref(0);
-  const nodeSelectorSpan = ref(24);
-  const customLabelsSpan = ref(24);
-  const inputCommandSpan = ref(24);
-  const inputArgsSpan = ref(24);
-  const inputPullSecretSpan = ref(24);
-  const inputImageSpan = ref(17);
-  const selectImagePullPolicySpan = ref(7);
-  const inputNumberMinCpuCoresSpan = ref(12);
-  const inputNumberMinMemorySpace = ref(12);
-  const localParamsSpan = ref(24);
+  const yamlEditorSpan = ref(0)
+  const nodeSelectorSpan = ref(24)
+  const customLabelsSpan = ref(24)
+  const inputCommandSpan = ref(24)
+  const inputArgsSpan = ref(24)
+  const inputPullSecretSpan = ref(24)
+  const inputImageSpan = ref(17)
+  const selectImagePullPolicySpan = ref(7)
+  const inputNumberMinCpuCoresSpan = ref(12)
+  const inputNumberMinMemorySpace = ref(12)
+  const localParamsSpan = ref(24)
 
   const initConstants = () => {
     if (model.customConfig) {
       // when user selects 'Custom Template' option, display yamlEditor and hide low-code fields
-      yamlEditorSpan.value = 24;
-      nodeSelectorSpan.value = 0;
-      customLabelsSpan.value = 0;
-      inputCommandSpan.value = 0;
-      inputArgsSpan.value = 0;
-      inputPullSecretSpan.value = 0;
-      inputImageSpan.value = 0;
-      selectImagePullPolicySpan.value = 0;
-      inputNumberMinCpuCoresSpan.value = 0;
-      inputNumberMinMemorySpace.value = 0;
-      localParamsSpan.value = 0;
+      yamlEditorSpan.value = 24
+      nodeSelectorSpan.value = 0
+      customLabelsSpan.value = 0
+      inputCommandSpan.value = 0
+      inputArgsSpan.value = 0
+      inputPullSecretSpan.value = 0
+      inputImageSpan.value = 0
+      selectImagePullPolicySpan.value = 0
+      inputNumberMinCpuCoresSpan.value = 0
+      inputNumberMinMemorySpace.value = 0
+      localParamsSpan.value = 0
     } else {
-      yamlEditorSpan.value = 0;
-      nodeSelectorSpan.value = 24;
-      customLabelsSpan.value = 24;
-      inputCommandSpan.value = 24;
-      inputArgsSpan.value = 24;
-      inputPullSecretSpan.value = 24;
-      inputImageSpan.value = 17;
-      selectImagePullPolicySpan.value = 7;
-      inputNumberMinCpuCoresSpan.value = 12;
-      inputNumberMinMemorySpace.value = 12;
-      localParamsSpan.value = 24;
+      yamlEditorSpan.value = 0
+      nodeSelectorSpan.value = 24
+      customLabelsSpan.value = 24
+      inputCommandSpan.value = 24
+      inputArgsSpan.value = 24
+      inputPullSecretSpan.value = 24
+      inputImageSpan.value = 17
+      selectImagePullPolicySpan.value = 7
+      inputNumberMinCpuCoresSpan.value = 12
+      inputNumberMinMemorySpace.value = 12
+      localParamsSpan.value = 24
     }
   }
 
@@ -68,10 +68,10 @@ export function useK8s(model: { [field: string]: any }): IJsonItem[] {
     initConstants()
   })
   watch(
-      () => model.customConfig,
-      () => {
-        initConstants()
-      }
+    () => model.customConfig,
+    () => {
+      initConstants()
+    }
   )
 
   return [
@@ -88,7 +88,7 @@ export function useK8s(model: { [field: string]: any }): IJsonItem[] {
       validate: {
         trigger: ['input', 'trigger'],
         required: true,
-        message: t('project.node.yaml_empty_tips')
+        message: t('project.node.k8s_yaml_empty_tips')
       }
     },
     {
@@ -189,7 +189,6 @@ export function useK8s(model: { [field: string]: any }): IJsonItem[] {
     })
   ]
 }
-
 
 export const IMAGE_PULL_POLICY_LIST = [
   {
