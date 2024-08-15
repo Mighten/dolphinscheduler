@@ -27,7 +27,6 @@ import org.apache.dolphinscheduler.plugin.task.api.enums.K8sYamlType;
 import org.apache.dolphinscheduler.plugin.task.api.enums.TaskTimeoutStrategy;
 import org.apache.dolphinscheduler.plugin.task.api.k8s.AbstractK8sOperation;
 import org.apache.dolphinscheduler.plugin.task.api.k8s.AbstractK8sTaskExecutor;
-import org.apache.dolphinscheduler.plugin.task.api.k8s.impl.K8sPodOperation;
 import org.apache.dolphinscheduler.plugin.task.api.model.TaskResponse;
 import org.apache.dolphinscheduler.plugin.task.api.parser.TaskOutputParameterParser;
 import org.apache.dolphinscheduler.plugin.task.api.utils.K8sUtils;
@@ -38,6 +37,7 @@ import org.apache.commons.lang3.StringUtils;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -237,6 +237,12 @@ public class K8sYamlTaskExecutor extends AbstractK8sTaskExecutor {
                 podLogOutputIsFinished = true;
             }
             taskOutputParams = taskOutputParameterParser.getTaskOutputParams();
+            log.info("[k8s-label-{}-result] ----------BEGIN K8S POD RESULT----------", labelPodLogWatch);
+            for (Map.Entry<String, String> entry : taskOutputParams.entrySet()) {
+                log.info("[k8s-label-{}-result] (key, value) = ('{}', '{}')",
+                        labelPodLogWatch, entry.getKey(), entry.getValue());
+            }
+            log.info("[k8s-label-{}-result] ----------END K8S POD RESULT----------", labelPodLogWatch);
         });
 
         collectPodLogExecutorService.shutdown();

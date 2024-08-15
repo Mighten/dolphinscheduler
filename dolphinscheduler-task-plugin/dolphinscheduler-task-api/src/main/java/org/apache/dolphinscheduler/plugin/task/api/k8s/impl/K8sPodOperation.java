@@ -177,12 +177,9 @@ public class K8sPodOperation implements AbstractK8sOperation {
                 log.warn("[k8s-label-{}] no pod found in namespace `{}`", labelValue, namespace);
                 return null;
             }
-            log.info("[k8s-label-{}] found {} pod(s) in namespace `{}`", labelValue, podList.size(), namespace);
             pod = podList.get(0);
             String phase = pod.getStatus().getPhase();
             if (phase.equals(K8sPodPhaseConstants.PENDING) || phase.equals(K8sPodPhaseConstants.UNKNOWN)) {
-                log.info("[k8s-label-{}] Pod `{}` in namespace `{}` is NOT Ready (Phase = {}), retry in {}ms",
-                        labelValue, pod.getMetadata().getName(), namespace, phase, TaskConstants.SLEEP_TIME_MILLIS);
                 ThreadUtils.sleep(TaskConstants.SLEEP_TIME_MILLIS);
             } else {
                 log.info("[k8s-label-{}] Pod `{}` in namespace `{}` is Ready (Phase = {})",
@@ -223,7 +220,6 @@ public class K8sPodOperation implements AbstractK8sOperation {
                     .withLabel(K8sYamlTaskExecutor.DS_LOG_WATCH_LABEL_NAME, labelValue);
             podList = watchList.list().getItems();
             if (!CollectionUtils.isEmpty(podList)) {
-                log.info("[k8s-label-{}] driver pod retrieved", labelValue);
                 break;
             }
             log.info("[k8s-label-{}] Failed to get driver pod, retry in {}ms",
