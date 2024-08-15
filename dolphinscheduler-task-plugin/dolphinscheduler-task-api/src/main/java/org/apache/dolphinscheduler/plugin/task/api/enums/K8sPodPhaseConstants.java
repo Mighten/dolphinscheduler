@@ -20,6 +20,7 @@ package org.apache.dolphinscheduler.plugin.task.api.enums;
 public class K8sPodPhaseConstants {
 
     public static final String SUCCEEDED = "Succeeded";
+    public static final String RUNNING = "Running";
     public static final String PENDING = "Pending";
     public static final String FAILED = "Failed";
     public static final String UNKNOWN = "Unknown";

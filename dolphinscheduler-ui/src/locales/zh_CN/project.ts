@@ -607,7 +607,7 @@ export default {
     or: '或',
     k8s_custom_template: '自定义模板',
     k8s_yaml_template: 'YAML',
-    yaml_empty_tips: 'YAML不能为空',
+    k8s_yaml_empty_tips: 'YAML不能为空',
     datax_custom_template: '自定义模板',
     datax_json_template: 'JSON',
     datax_target_datasource_type: '目标源类型',

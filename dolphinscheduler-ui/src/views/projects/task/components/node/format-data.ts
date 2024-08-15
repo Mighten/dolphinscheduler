@@ -352,8 +352,11 @@ export function formatParams(data: INodeData): {
 
   if (data.taskType === 'K8S') {
     taskParams.customConfig = data.customConfig ? 1 : 0
+    taskParams.namespace = data.namespace
+    taskParams.type = data.type
+    taskParams.kubeConfig = data.kubeConfig
+    taskParams.datasource = data.datasource
     if (taskParams.customConfig === 0) {
-      taskParams.namespace = data.namespace
       taskParams.minCpuCores = data.minCpuCores
       taskParams.minMemorySpace = data.minMemorySpace
       taskParams.image = data.image
@@ -362,9 +365,6 @@ export function formatParams(data: INodeData): {
       taskParams.args = data.args
       taskParams.customizedLabels = data.customizedLabels
       taskParams.nodeSelectors = data.nodeSelectors
-      taskParams.datasource = data.datasource
-      taskParams.type = data.type
-      taskParams.kubeConfig = data.kubeConfig
       taskParams.pullSecret = data.pullSecret
     } else {
       taskParams.yamlContent = data.yamlContent

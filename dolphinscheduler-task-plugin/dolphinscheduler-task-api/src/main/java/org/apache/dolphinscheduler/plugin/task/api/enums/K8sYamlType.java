@@ -21,8 +21,7 @@ package org.apache.dolphinscheduler.plugin.task.api.enums;
  * K8sYamlType defines Kubernetes YAML types.
  */
 public enum K8sYamlType {
-    CONFIG_MAP,
-    POD,
+    Pod,
 
     ;
 }

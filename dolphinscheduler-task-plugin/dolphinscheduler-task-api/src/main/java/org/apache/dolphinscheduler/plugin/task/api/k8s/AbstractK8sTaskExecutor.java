@@ -54,7 +54,7 @@ public abstract class AbstractK8sTaskExecutor {
      * <p>This method processes the input parameter which can either be a custom configuration
      * of type {@link K8sTaskMainParameters} or YAML content describing the Kubernetes job.</p>
      *
-     * @param k8sParameterStr a string of either user-customized YAML string wrapped up in JSON or K8sTaskMainParameters::toString
+     * @param k8sParameterStr a string of either user-customized YAML or K8sTaskMainParameters
      * @return a {@link TaskResponse} object containing the result of the task execution.
      * @throws Exception if an error occurs during task execution or while handling pod logs.
      */

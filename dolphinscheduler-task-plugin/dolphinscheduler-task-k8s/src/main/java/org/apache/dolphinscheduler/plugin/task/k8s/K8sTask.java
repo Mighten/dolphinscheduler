@@ -112,16 +112,17 @@ public class K8sTask extends AbstractK8sTask {
     @Override
     public void handle(TaskCallBack taskCallBack) throws TaskException {
         try {
+            TaskResponse response;
             if (k8sTaskParameters.getCustomConfig() == 0) {
                 // low-code k8s Job
-                TaskResponse response = abstractK8sTaskExecutor.run(buildCommand());
-                setExitStatusCode(response.getExitStatusCode());
-                setAppIds(response.getAppIds());
-                dealOutParam(abstractK8sTaskExecutor.getTaskOutputParams());
+                response = abstractK8sTaskExecutor.run(buildCommand());
             } else {
                 // k8s customized YAML task
-                abstractK8sTaskExecutor.run(k8sTaskParameters.getYamlContent());
+                response = abstractK8sTaskExecutor.run(k8sTaskParameters.getYamlContent());
             }
+            setExitStatusCode(response.getExitStatusCode());
+            setAppIds(response.getAppIds());
+            dealOutParam(abstractK8sTaskExecutor.getTaskOutputParams());
         } catch (Exception e) {
             log.error("k8s task submit failed with error");
             exitStatusCode = -1;

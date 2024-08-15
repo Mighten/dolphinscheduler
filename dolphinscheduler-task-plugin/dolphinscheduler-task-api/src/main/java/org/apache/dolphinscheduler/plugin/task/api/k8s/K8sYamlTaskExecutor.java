@@ -18,7 +18,7 @@
 package org.apache.dolphinscheduler.plugin.task.api.k8s;
 
 import org.apache.dolphinscheduler.common.thread.ThreadUtils;
-import org.apache.dolphinscheduler.common.utils.JSONUtils;
+import org.apache.dolphinscheduler.common.utils.YamlUtils;
 import org.apache.dolphinscheduler.plugin.task.api.K8sTaskExecutionContext;
 import org.apache.dolphinscheduler.plugin.task.api.TaskConstants;
 import org.apache.dolphinscheduler.plugin.task.api.TaskException;
@@ -27,19 +27,15 @@ import org.apache.dolphinscheduler.plugin.task.api.enums.K8sYamlType;
 import org.apache.dolphinscheduler.plugin.task.api.enums.TaskTimeoutStrategy;
 import org.apache.dolphinscheduler.plugin.task.api.k8s.impl.K8sPodOperation;
 import org.apache.dolphinscheduler.plugin.task.api.model.TaskResponse;
-import org.apache.dolphinscheduler.plugin.task.api.parameters.K8sYamlContentDTO;
 import org.apache.dolphinscheduler.plugin.task.api.parser.TaskOutputParameterParser;
+import org.apache.dolphinscheduler.plugin.task.api.utils.K8sUtils;
 import org.apache.dolphinscheduler.plugin.task.api.utils.LogUtils;
-import org.apache.dolphinscheduler.plugin.task.api.utils.MapUtils;
 
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
-import java.util.HashMap;
 import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -47,7 +43,11 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import lombok.extern.slf4j.Slf4j;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+
 import io.fabric8.kubernetes.api.model.HasMetadata;
+import io.fabric8.kubernetes.api.model.ObjectMeta;
 import io.fabric8.kubernetes.client.Watch;
 import io.fabric8.kubernetes.client.dsl.LogWatch;
 
@@ -63,6 +63,8 @@ public class K8sYamlTaskExecutor extends AbstractK8sTaskExecutor {
     protected Future<?> podLogOutputFuture;
     private AbstractK8sOperation abstractK8sOperation;
 
+    public static final String DS_LOG_WATCH_LABEL_NAME = "ds-log-watch-label";
+
     public K8sYamlTaskExecutor(TaskExecutionContext taskRequest) {
         super(taskRequest);
     }
@@ -72,7 +74,7 @@ public class K8sYamlTaskExecutor extends AbstractK8sTaskExecutor {
      *
      * <p>This method processes the YAML content describing the Kubernetes job.</p>
      *
-     * @param yamlContentString a string of user-customized YAML string wrapped up in JSON
+     * @param yamlContentString a string of user-customized YAML
      * @return a {@link TaskResponse} object containing the result of the task execution.
      * @throws Exception if an error occurs during task execution or while handling pod logs.
      */
@@ -88,22 +90,27 @@ public class K8sYamlTaskExecutor extends AbstractK8sTaskExecutor {
             K8sTaskExecutionContext k8sTaskExecutionContext = taskRequest.getK8sTaskExecutionContext();
             k8sUtils.buildClient(k8sTaskExecutionContext.getConfigYaml());
 
-            // parse user-customized YAML string wrapped up in JSON
-            // i.e., `K8sYamlContentDto` looks like: `{"type": ${K8sYamlType.POD}, "yaml": ${yaml} }`
-            K8sYamlContentDTO k8sYamlContentDTO = JSONUtils.parseObject(yamlContentString, K8sYamlContentDTO.class);
-            k8sYamlType = Objects.requireNonNull(k8sYamlContentDTO).getType();
+            // parse user-customized YAML string
+            metadata = K8sUtils.getOrDefaultNamespacedResource(
+                    YamlUtils.load(yamlContentString, new TypeReference<HasMetadata>() {
+                    }));
+
+            k8sYamlType = K8sYamlType.valueOf(this.metadata.getKind());
             generateOperation();
 
             submitJob2k8s(yamlContentString);
-            parseLogOutput();
+            parseLogOutput(metadata);
             registerBatchK8sYamlTaskWatcher(String.valueOf(taskInstanceId), result);
 
             if (podLogOutputFuture != null) {
                 try {
                     // Wait kubernetes pod log collection finished
                     podLogOutputFuture.get();
+                    log.info("[K8sYamlTaskExecutor-label-{}-{}] pod log collected successfully",
+                            metadata.getMetadata().getName(), taskInstanceId);
                 } catch (ExecutionException e) {
-                    log.error("Handle pod log error", e);
+                    log.error("[K8sYamlTaskExecutor-label-{}-{}] Handle pod log error",
+                            metadata.getMetadata().getName(), taskInstanceId, e);
                 }
             }
         } catch (Exception e) {
@@ -116,60 +123,56 @@ public class K8sYamlTaskExecutor extends AbstractK8sTaskExecutor {
     }
 
     @Override
-    public void cancelApplication(String k8sParameterStr) {
+    public void cancelApplication(String yamlContentStr) {
         if (metadata != null) {
-            stopJobOnK8s(k8sParameterStr);
+            stopJobOnK8s(yamlContentStr);
+            final String taskName = metadata.getMetadata().getName();
+            final int taskInstanceId = taskRequest.getTaskInstanceId();
+            log.info("[K8sYamlTaskExecutor-label-{}-{}] K8s task canceled", taskName, taskInstanceId);
         }
     }
 
     @Override
     public void submitJob2k8s(String yamlContentString) {
-        String taskName = taskRequest.getTaskName().toLowerCase(Locale.ROOT);
-        int taskInstanceId = taskRequest.getTaskInstanceId();
-        String k8sJobName = String.format("%s-%s", taskName, taskInstanceId);
-
-        K8sYamlContentDTO yamlContentDto =
-                JSONUtils.parseObject(yamlContentString, K8sYamlContentDTO.class);
-
-        metadata = abstractK8sOperation.buildMetadata(yamlContentDto);
-
-        Map<String, String> labelMap = metadata.getMetadata().getLabels();
-        if (MapUtils.isEmpty(labelMap)) {
-            labelMap = new HashMap<String, String>(1);
-        }
-
+        final String taskName = metadata.getMetadata().getName();
+        final int taskInstanceId = taskRequest.getTaskInstanceId();
         try {
-            log.info("[K8sYamlJobExecutor-{}-{}] start to submit job", taskName, taskInstanceId);
-            abstractK8sOperation.createOrReplaceMetadata(metadata);
-            log.info("[K8sYamlJobExecutor-{}-{}] submitted job successfully", taskName, taskInstanceId);
+            abstractK8sOperation.createOrReplaceMetadata(metadata, taskInstanceId);
+            log.info("[K8sYamlTaskExecutor-label-{}-{}] K8s task submitted successfully", taskName, taskInstanceId);
         } catch (Exception e) {
-            log.error("[K8sYamlJobExecutor-{}-{}] fail to submit job", taskName, taskInstanceId);
-            throw new TaskException("K8sYamlJobExecutor fail to submit job", e);
+            log.error("[K8sYamlTaskExecutor-label-{}-{}] failed to submit job", taskName, taskInstanceId);
+            e.printStackTrace();
+            throw new TaskException("K8sYamlTaskExecutor failed to submit job", e);
         }
     }
 
     @Override
     public void stopJobOnK8s(String k8sParameterStr) {
-        String namespaceName = metadata.getMetadata().getNamespace();
-        String jobName = metadata.getMetadata().getName();
         try {
-            abstractK8sOperation.stopMetadata(metadata);
+            abstractK8sOperation.stopMetadata(this.metadata);
         } catch (Exception e) {
-            log.error("[K8sYamlJobExecutor-{}] fail to stop job in namespace {}", jobName, namespaceName);
-            throw new TaskException("K8sYamlJobExecutor fail to stop job", e);
+            String taskName = this.metadata.getMetadata().getName();
+            String taskNamespace = this.metadata.getMetadata().getNamespace();
+            log.error("[K8sYamlTaskExecutor-label-{}] fail to stop job in namespace {}", taskName, taskNamespace);
+            throw new TaskException("K8sYamlTaskExecutor fail to stop job", e);
         }
     }
 
     private void generateOperation() {
         switch (k8sYamlType) {
-            case POD:
+            case Pod:
                 abstractK8sOperation = new K8sPodOperation(k8sUtils.getClient());
+                break;
             default:
-                throw new TaskException(String.format("do not support type %s", k8sYamlType.name()));
+                throw new TaskException(
+                        String.format("K8sYamlTaskExecutor do not support type %s", k8sYamlType.name()));
         }
     }
 
     public void registerBatchK8sYamlTaskWatcher(String taskInstanceId, TaskResponse taskResponse) {
+        final String taskName = metadata.getMetadata().getName();
+        final String taskNamespace = metadata.getMetadata().getNamespace();
+
         CountDownLatch countDownLatch = new CountDownLatch(1);
 
         try (
@@ -184,38 +187,48 @@ public class K8sYamlTaskExecutor extends AbstractK8sTaskExecutor {
                 countDownLatch.await();
             }
         } catch (InterruptedException e) {
-            log.error("job failed in k8s: {}", e.getMessage(), e);
+            log.error("[K8sYamlTaskExecutor-label-{}-{}] failed in namespace `{}`: {}",
+                    taskName, taskInstanceId, taskNamespace, e.getMessage(), e);
             Thread.currentThread().interrupt();
             taskResponse.setExitStatusCode(TaskConstants.EXIT_CODE_FAILURE);
         } catch (Exception e) {
-            log.error("job failed in k8s: {}", e.getMessage(), e);
+            log.error("[K8sYamlTaskExecutor-label-{}-{}] failed in namespace `{}`: {}",
+                    taskName, taskInstanceId, taskNamespace, e.getMessage(), e);
+            e.printStackTrace();
             taskResponse.setExitStatusCode(TaskConstants.EXIT_CODE_FAILURE);
         }
     }
 
-    private void parseLogOutput() {
-        ExecutorService collectPodLogExecutorService = ThreadUtils
-                .newSingleDaemonScheduledExecutorService("CollectPodLogOutput-thread-" + taskRequest.getTaskName());
+    private void parseLogOutput(HasMetadata resource) {
+        ObjectMeta resourceMetadata = resource.getMetadata();
+        final int taskInstanceId = taskRequest.getTaskInstanceId();
+        final int workflowInstanceId = taskRequest.getProcessInstanceId();
+        final String taskName = resourceMetadata.getName().toLowerCase(Locale.ROOT);
+        final String namespace = resourceMetadata.getNamespace();
+        final String labelPodLogWatch = String.format("%s-%d", taskName, taskInstanceId);
 
-        String taskInstanceId = String.valueOf(taskRequest.getTaskInstanceId());
-        String taskName = taskRequest.getTaskName().toLowerCase(Locale.ROOT);
-        String containerName = String.format("%s-%s", taskName, taskInstanceId);
+        ExecutorService collectPodLogExecutorService = ThreadUtils
+                .newSingleDaemonScheduledExecutorService("CollectPodLogOutput-thread-" + taskName);
+
         podLogOutputFuture = collectPodLogExecutorService.submit(() -> {
             TaskOutputParameterParser taskOutputParameterParser = new TaskOutputParameterParser();
-            LogUtils.setWorkflowAndTaskInstanceIDMDC(taskRequest.getProcessInstanceId(),
-                    taskRequest.getTaskInstanceId());
+            LogUtils.setWorkflowAndTaskInstanceIDMDC(workflowInstanceId, taskInstanceId);
             LogUtils.setTaskInstanceLogFullPathMDC(taskRequest.getLogPath());
-            try (
-                    LogWatch watcher =
-                            abstractK8sOperation.getLogWatcher(containerName, metadata.getMetadata().getNamespace())) {
-                String line;
+
+            try (LogWatch watcher = abstractK8sOperation.getLogWatcher(labelPodLogWatch, namespace)) {
                 try (BufferedReader reader = new BufferedReader(new InputStreamReader(watcher.getOutput()))) {
+                    String line;
                     while ((line = reader.readLine()) != null) {
-                        log.info("[K8S-pod-log] {}", line);
+                        log.info("[k8s-label-{}-pod-log] {}", labelPodLogWatch, line);
                         taskOutputParameterParser.appendParseLog(line);
                     }
+                } catch (Exception e) {
+                    log.error("[k8s-label-{}-pod-log] failed to open BufferedReader on LogWatch", labelPodLogWatch);
+                    e.printStackTrace();
+                    throw new RuntimeException("failed to open LogWatch", e);
                 }
             } catch (Exception e) {
+                e.printStackTrace();
                 throw new RuntimeException(e);
             } finally {
                 LogUtils.removeTaskInstanceLogFullPathMDC();

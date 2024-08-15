@@ -20,7 +20,6 @@ package org.apache.dolphinscheduler.plugin.task.api.k8s;
 import org.apache.dolphinscheduler.plugin.task.api.TaskConstants;
 import org.apache.dolphinscheduler.plugin.task.api.TaskExecutionContext;
 import org.apache.dolphinscheduler.plugin.task.api.model.TaskResponse;
-import org.apache.dolphinscheduler.plugin.task.api.parameters.K8sYamlContentDTO;
 
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -34,14 +33,15 @@ public interface AbstractK8sOperation {
 
     int MAX_RETRY_TIMES = 3;
 
-    HasMetadata buildMetadata(K8sYamlContentDTO yamlContentDto);
+    HasMetadata buildMetadata(String yamlContentStr);
 
     /**
      * create or replace a resource in the kubernetes cluster
      * @param metadata resource metadata, e.g., io.fabric8.kubernetes.api.model.Pod
+     * @param taskInstanceId task instance id
      * @throws Exception if error occurred in creating or replacing a resource
      */
-    void createOrReplaceMetadata(HasMetadata metadata) throws Exception;
+    void createOrReplaceMetadata(HasMetadata metadata, int taskInstanceId) throws Exception;
 
     /**
      * stop a resource in the kubernetes cluster

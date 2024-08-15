@@ -621,7 +621,7 @@ export default {
     or: 'or',
     k8s_custom_template: 'Custom Template',
     k8s_yaml_template: 'YAML',
-    yaml_empty_tips: 'The YAML can not be empty.',
+    k8s_yaml_empty_tips: 'The YAML can not be empty.',
     datax_custom_template: 'Custom Template',
     datax_json_template: 'JSON',
     datax_target_datasource_type: 'Target Datasource Types',

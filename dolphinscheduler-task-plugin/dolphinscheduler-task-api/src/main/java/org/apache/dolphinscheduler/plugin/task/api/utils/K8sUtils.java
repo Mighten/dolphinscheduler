@@ -70,7 +70,7 @@ public class K8sUtils {
      */
     public static HasMetadata getOrDefaultNamespacedResource(HasMetadata resource) throws TaskException {
         if (resource == null)
-            throw new TaskException("failed to create k8s resource with null parameter");
+            throw new TaskException("failed to process k8s resource with null parameter");
         ObjectMeta metadata = resource.getMetadata();
         if (StringUtils.isBlank(metadata.getNamespace())) {
             metadata.setNamespace(K8S_NAMESPACE_DEFAULT);
