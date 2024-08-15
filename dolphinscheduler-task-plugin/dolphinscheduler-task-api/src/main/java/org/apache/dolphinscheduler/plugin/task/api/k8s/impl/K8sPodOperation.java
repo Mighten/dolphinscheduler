@@ -23,7 +23,6 @@ import org.apache.dolphinscheduler.plugin.task.api.TaskConstants;
 import org.apache.dolphinscheduler.plugin.task.api.TaskExecutionContext;
 import org.apache.dolphinscheduler.plugin.task.api.enums.K8sPodPhaseConstants;
 import org.apache.dolphinscheduler.plugin.task.api.k8s.AbstractK8sOperation;
-import org.apache.dolphinscheduler.plugin.task.api.k8s.K8sYamlTaskExecutor;
 import org.apache.dolphinscheduler.plugin.task.api.model.TaskResponse;
 import org.apache.dolphinscheduler.plugin.task.api.utils.K8sUtils;
 import org.apache.dolphinscheduler.plugin.task.api.utils.LogUtils;
