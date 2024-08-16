@@ -17,7 +17,8 @@
 
 package org.apache.dolphinscheduler.plugin.task.api.utils;
 
-import org.apache.dolphinscheduler.plugin.task.api.TaskConstants;
+import static org.apache.dolphinscheduler.plugin.task.api.TaskConstants.LOG_LINES;
+
 import org.apache.dolphinscheduler.plugin.task.api.TaskException;
 
 import org.apache.commons.lang3.StringUtils;
@@ -72,12 +73,11 @@ public class K8sUtils {
 
     public void createJob(String namespace, Job job) {
         try {
-            job = (Job) getOrDefaultNamespacedResource(job);
             client.batch()
                     .v1()
                     .jobs()
-                    .resource(job)
-                    .create();
+                    .inNamespace(namespace)
+                    .create(job);
         } catch (Exception e) {
             throw new TaskException("fail to create job", e);
         }
@@ -88,7 +88,7 @@ public class K8sUtils {
             client.batch()
                     .v1()
                     .jobs()
-                    .inNamespace(getOrDefaultNamespace(namespace))
+                    .inNamespace(namespace)
                     .withName(jobName)
                     .delete();
         } catch (Exception e) {
@@ -119,7 +119,6 @@ public class K8sUtils {
 
     public String getPodLog(String jobName, String namespace) {
         try {
-            namespace = getOrDefaultNamespace(namespace);
             List<Pod> podList = client.pods().inNamespace(namespace).list().getItems();
             String podName = null;
             for (Pod pod : podList) {
@@ -130,7 +129,7 @@ public class K8sUtils {
             }
             return client.pods().inNamespace(namespace)
                     .withName(podName)
-                    .tailingLines(TaskConstants.LOG_LINES)
+                    .tailingLines(LOG_LINES)
                     .getLog(Boolean.TRUE);
         } catch (Exception e) {
             log.error("fail to getPodLog", e);

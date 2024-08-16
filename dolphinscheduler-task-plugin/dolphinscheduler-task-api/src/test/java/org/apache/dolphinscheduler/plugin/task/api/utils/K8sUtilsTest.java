@@ -52,7 +52,6 @@ public class K8sUtilsTest {
         Assertions.assertTrue(StringUtils.isNotBlank(namespace));
         namespace = "my-namespace-name";
         Assertions.assertEquals(namespace, K8sUtils.getOrDefaultNamespace(namespace));
-        logger.info("done");
     }
 
     @Test
