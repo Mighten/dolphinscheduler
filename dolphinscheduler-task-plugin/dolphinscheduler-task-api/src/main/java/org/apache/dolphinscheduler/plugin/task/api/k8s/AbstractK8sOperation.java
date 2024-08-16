@@ -29,15 +29,25 @@ import io.fabric8.kubernetes.api.model.StatusDetails;
 import io.fabric8.kubernetes.client.Watch;
 import io.fabric8.kubernetes.client.dsl.LogWatch;
 
+/**
+ * AbstractK8sOperation defines Operation for User-customized YAML tasks
+ */
 public interface AbstractK8sOperation {
 
     int MAX_RETRY_TIMES = 3;
 
+    /**
+     * Builds metadata for Kubernetes resource from user-customized YAML content string.
+     *
+     * @param yamlContentStr user-customized YAML content string.
+     * @return The {@link HasMetadata} object representing the metadata of the Kubernetes resource.
+     */
     HasMetadata buildMetadata(String yamlContentStr);
 
     /**
-     * create or replace a resource in the kubernetes cluster
-     * @param metadata resource metadata, e.g., io.fabric8.kubernetes.api.model.Pod
+     * Creates or replaces a resource in the Kubernetes cluster.
+     *
+     * @param metadata The {@link HasMetadata} object representing the metadata of the Kubernetes resource
      * @param taskInstanceId task instance id
      * @throws Exception if error occurred in creating or replacing a resource
      */
@@ -45,20 +55,52 @@ public interface AbstractK8sOperation {
 
     /**
      * stop a resource in the kubernetes cluster
-     * @param metadata resource metadata, e.g., io.fabric8.kubernetes.api.model.Pod
+     *
+     * @param metadata {@link HasMetadata} object representing the metadata of the Kubernetes resource
      * @return a list of StatusDetails
      * @throws Exception if error occurred in stopping a resource
      */
     List<StatusDetails> stopMetadata(HasMetadata metadata) throws Exception;
 
+    /**
+     * Gets the state of a Kubernetes resource.
+     *
+     * @param hasMetadata {@link HasMetadata} object representing the metadata.
+     * @return An integer representing the state of the Pod.
+     */
     int getState(HasMetadata hasMetadata);
 
+    /**
+     * Creates a watch to monitor the state of the Kubernetes resource.
+     *
+     * @param countDownLatch A CountDownLatch that will be counted down when the Pod's state changes or an error occurs.
+     * @param taskResponse the response of the task.
+     * @param hasMetadata {@link HasMetadata} object representing the Kubernetes resource metadata.
+     * @param taskRequest Context information for the task, including task instance ID and process instance ID.
+     * @return A {@link Watch} object that monitors the specified Pod and triggers events based on the Pod's status.
+     */
     Watch createBatchWatcher(CountDownLatch countDownLatch,
                              TaskResponse taskResponse, HasMetadata hasMetadata,
                              TaskExecutionContext taskRequest);
 
+    /**
+     * Creates a log watcher for a Pod.
+     *
+     * @param labelValue The unique label value to filter and identify the Pod.
+     * @param namespace The namespace where Pod locates. If the namespace is not specified a default namespace is used.
+     * @return A {@link LogWatch} object that allows watching the logs of the identified Pod.
+     *         Returns null if no Pod is found or if the Pod is not in a state where logs can be watched.
+     */
     LogWatch getLogWatcher(String labelValue, String namespace);
 
+    /**
+     * Sets the status of a task.
+     *
+     * @param metadata {@link HasMetadata} object representing the Kubernetes resource metadata
+     * @param jobStatus The status of the job defined in {@link TaskConstants}.
+     * @param taskInstanceId A unique identifier to track the task instance.
+     * @param taskResponse the response of the task.
+     */
     default void setTaskStatus(HasMetadata metadata, int jobStatus, String taskInstanceId, TaskResponse taskResponse) {
         if (jobStatus == TaskConstants.EXIT_CODE_SUCCESS || jobStatus == TaskConstants.EXIT_CODE_FAILURE) {
             if (jobStatus == TaskConstants.EXIT_CODE_SUCCESS) {

@@ -51,15 +51,24 @@ import io.fabric8.kubernetes.client.dsl.FilterWatchListDeletable;
 import io.fabric8.kubernetes.client.dsl.LogWatch;
 import io.fabric8.kubernetes.client.dsl.PodResource;
 
+/**
+ * K8sPodOperation defines user-customized k8s Pod tasks
+ */
 @Slf4j
 public class K8sPodOperation implements AbstractK8sOperation {
 
-    private KubernetesClient client;
+    private final KubernetesClient client;
 
     public K8sPodOperation(KubernetesClient client) {
         this.client = client;
     }
 
+    /**
+     * Builds metadata for a Pod resource from user-customized YAML content string.
+     *
+     * @param yamlContentStr user-customized YAML content string
+     * @return The {@link HasMetadata} object representing the metadata of the Pod resource
+     */
     @Override
     public HasMetadata buildMetadata(String yamlContentStr) {
         Pod pod = (Pod) K8sUtils.getOrDefaultNamespacedResource(
@@ -70,7 +79,8 @@ public class K8sPodOperation implements AbstractK8sOperation {
 
     /**
      * create or replace a pod in the kubernetes cluster
-     * @param resource Pod (io.fabric8.kubernetes.api.model.Pod)
+     *
+     * @param resource {@link HasMetadata} object representing the metadata of {@link Pod}
      * @param taskInstanceId task instance id
      * @throws Exception if error occurred in creating or replacing a resource
      */
@@ -99,6 +109,12 @@ public class K8sPodOperation implements AbstractK8sOperation {
         }
     }
 
+    /**
+     * Gets the state of a Pod based on its phase.
+     *
+     * @param hasMetadata {@link HasMetadata} object representing the metadata of {@link Pod}
+     * @return An integer representing the state of the Pod.
+     */
     @Override
     public int getState(HasMetadata hasMetadata) {
         Pod pod = (Pod) K8sUtils.getOrDefaultNamespacedResource(hasMetadata);
@@ -113,6 +129,15 @@ public class K8sPodOperation implements AbstractK8sOperation {
         }
     }
 
+    /**
+     * Creates a watch to monitor the state of the pod.
+     *
+     * @param countDownLatch A CountDownLatch that will be counted down when the Pod's state changes or an error occurs.
+     * @param taskResponse the status of the task.
+     * @param hasMetadata {@link HasMetadata} object representing the metadata of {@link Pod}
+     * @param taskRequest Context information for the task, including task instance ID and process instance ID.
+     * @return A {@link Watch} object that monitors the specified Pod and triggers events based on the Pod's status.
+     */
     @Override
     public Watch createBatchWatcher(CountDownLatch countDownLatch,
                                     TaskResponse taskResponse, HasMetadata hasMetadata,
@@ -164,6 +189,14 @@ public class K8sPodOperation implements AbstractK8sOperation {
                 .watch(watcher);
     }
 
+    /**
+     * Creates a log watcher for a Pod.
+     *
+     * @param labelValue The unique label value to filter and identify the Pod
+     * @param namespace The namespace where Pod locates. If the namespace is not specified a default namespace is used.
+     * @return A {@link LogWatch} object that allows watching the logs of the identified Pod.
+     *         Returns null if no Pod is found or if the Pod is not in a state where logs can be watched.
+     */
     @Override
     public LogWatch getLogWatcher(String labelValue, String namespace) {
         namespace = K8sUtils.getOrDefaultNamespace(namespace);
@@ -193,8 +226,9 @@ public class K8sPodOperation implements AbstractK8sOperation {
     }
 
     /**
-     * stop a pod in the kubernetes cluster
-     * @param metadata Pod metadata (io.fabric8.kubernetes.api.model.Pod)
+     * Stops a pod in the Kubernetes cluster.
+     *
+     * @param metadata {@link HasMetadata} object representing the metadata of {@link Pod}
      * @return a list of StatusDetails
      * @throws Exception if error occurred in stopping a resource
      */

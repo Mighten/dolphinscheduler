@@ -59,12 +59,19 @@ import io.fabric8.kubernetes.client.dsl.LogWatch;
 @Slf4j
 public class K8sYamlTaskExecutor extends AbstractK8sTaskExecutor {
 
+    // resource metadata parsed from user-customized YAML
     private HasMetadata metadata;
+
+    // type of metadata, used to generate operation
     private K8sYamlType k8sYamlType;
-    protected boolean podLogOutputIsFinished = false;
-    protected Future<?> podLogOutputFuture;
+
+    // k8s operation, generated based on `k8sYamlType`
     private AbstractK8sOperation abstractK8sOperation;
 
+    protected boolean podLogOutputIsFinished = false;
+    protected Future<?> podLogOutputFuture;
+
+    // k8s pod label name to collect pod log
     public static final String DS_LOG_WATCH_LABEL_NAME = "ds-log-watch-label";
 
     public K8sYamlTaskExecutor(TaskExecutionContext taskRequest) {
@@ -160,6 +167,9 @@ public class K8sYamlTaskExecutor extends AbstractK8sTaskExecutor {
         }
     }
 
+    /**
+     * Generates the Kubernetes operation based on the Kubernetes YAML type.
+     */
     private void generateOperation() {
         switch (k8sYamlType) {
             case Pod:

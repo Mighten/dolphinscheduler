@@ -17,6 +17,9 @@
 
 package org.apache.dolphinscheduler.plugin.task.api.enums;
 
+/**
+ * K8sPodPhaseConstants describes the lifecycle of a Pod.
+ */
 public class K8sPodPhaseConstants {
 
     public static final String SUCCEEDED = "Succeeded";
